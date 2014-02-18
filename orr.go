@@ -168,6 +168,7 @@ func hgetFromRedis(key string, field interface{}, typ reflect.Type) (interface{}
 	res := reflect.New(typ).Interface()
 
 	conn := rpool.Get()
+	defer conn.Close()
 	buf, err := conn.Do("HGET", key, field)
 	if err != nil {
 		return nil, err
@@ -185,6 +186,7 @@ func hgetFromRedis(key string, field interface{}, typ reflect.Type) (interface{}
 
 func hsetToRedis(key string, field interface{}, value []byte, typ reflect.Type) error {
 	conn := rpool.Get()
+	defer conn.Close()
 	_, err := conn.Do("HSET", key, field, value)
 	if err != nil {
 		return err

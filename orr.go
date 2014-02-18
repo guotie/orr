@@ -13,7 +13,10 @@ import (
 	"time"
 )
 
-var rpool *redis.Pool
+var (
+	rpool *redis.Pool
+	rconn redis.Conn
+)
 
 func OpenRedis(proto, addr string) {
 	if proto == "" {
@@ -39,7 +42,8 @@ func OpenRedis(proto, addr string) {
 			return err
 		},
 	}
-	_, err := rpool.Get().Do("PING")
+	rconn = rpool.Get()
+	_, err := rconn.Do("PING")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -81,7 +85,7 @@ func Save(obj interface{}, fieldname string) error {
 	if err != nil {
 		return fmt.Errorf("Marshal field %s failed: %s.", err.Error())
 	}
-	err = hsetToRedis(redisFieldname, iid, buf, vfield.Type())
+	err = hsetToRedis(redisFieldname, iid, buf, "map")
 	if err != nil {
 		return err
 	}
@@ -184,7 +188,7 @@ func hgetFromRedis(key string, field interface{}, typ reflect.Type) (interface{}
 	return res, nil
 }
 
-func hsetToRedis(key string, field interface{}, value []byte, typ reflect.Type) error {
+func hsetToRedis(key string, field interface{}, value []byte, typ string) error {
 	conn := rpool.Get()
 	defer conn.Close()
 	_, err := conn.Do("HSET", key, field, value)

@@ -111,44 +111,13 @@ func TestOrrGet(t *testing.T) {
 		"2": Message{2, false, 0},
 	}
 	acct1.Msg = Message{3, true, 390}
-	/*
-		breads, err := json.Marshal(acct1.Reads)
-		if err != nil {
-			t.Fatal("marshal Reads failed!\n")
-		}
-		bfollow, err := json.Marshal(acct1.Follow)
-		if err != nil {
-			t.Fatal("marshal Follow failed!\n")
-		}
-		bmessage, err := json.Marshal(acct1.Messages)
-		if err != nil {
-			t.Fatal("marshal Messages failed!\n")
-		}
 
-		err = saveRedis("account-reads", acct1.Id, breads)
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-		saveRedis("account-follow", acct1.Id, bfollow)
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-		saveRedis("account-messages", acct1.Id, bmessage)
-		if err != nil {
-			t.Fatal(err.Error())
-		}
-	*/
 	Save(acct1, "Reads")
 	Save(acct1, "Follow")
 	Save(acct1, "Messages")
 
 	acct2 := &Account{Id: 1}
-	/*
-		tfield, _ := reflect.ValueOf(acct2).Elem().Type().FieldByName("Reads")
-		fmt.Println(tfield.Type.Elem())
-		tfollow, _ := reflect.ValueOf(acct2).Elem().Type().FieldByName("Follow")
-		fmt.Println(tfollow.Type.Elem())
-	*/
+
 	err := Restore(acct2, "Reads")
 	if err != nil {
 		t.Fatal(err.Error())
@@ -167,6 +136,38 @@ func TestOrrGet(t *testing.T) {
 	}
 	fmt.Println("Follow:", acct2.Follow)
 
+}
+
+func TestSaveSpeed(t *testing.T) {
+	acct2 := &Account{Id: 2}
+	acct2.Reads = make(map[string]int64)
+	savespeed(acct2, 0)
+	savespeed(acct2, 10)
+	savespeed(acct2, 100)
+	savespeed(acct2, 1000)
+	savespeed(acct2, 10000)
+}
+
+func savespeed(acct *Account, sz int) {
+	for i := 0; i < sz; i++ {
+		acct.Reads[string(i)] = int64(i)
+	}
+
+	t1 := time.Now()
+	Save(acct, "Reads")
+	t2 := time.Now()
+	d := t2.Sub(t1)
+	fmt.Printf("Save %d map: %d nanosecond, %f ms.\n", sz, d, float64(d)/1000000)
+}
+
+type F func() int
+
+func tmfunc(f F) (time.Duration, int) {
+	t1 := time.Now()
+	res := f()
+	t2 := time.Now()
+
+	return t2.Sub(t1), res
 }
 
 // ------------------------------------------------------

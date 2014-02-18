@@ -10,9 +10,40 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"reflect"
 	"strings"
+	"time"
 )
 
 var rpool *redis.Pool
+
+func OpenRedis(proto, addr string) {
+	if proto == "" {
+		proto = "tcp"
+	}
+	if addr == "" {
+		addr = "127.0.0.1:6379"
+	}
+	rpool = &redis.Pool{
+		MaxIdle:     10,
+		IdleTimeout: 600 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial(proto, addr)
+			if err != nil {
+				panic(err)
+				return nil, err
+			}
+
+			return c, nil
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
+	_, err := rpool.Get().Do("PING")
+	if err != nil {
+		panic(err.Error())
+	}
+}
 
 // 将数据结构Marshal, 并保存
 func Save(obj interface{}, fieldname string) error {
@@ -24,8 +55,8 @@ func Save(obj interface{}, fieldname string) error {
 	vobj := reflect.ValueOf(obj)
 
 	if tobj.Kind() == reflect.Ptr {
-		obj = vobj.Elem()
-		tobj = reflect.TypeOf(obj)
+		vobj = vobj.Elem()
+		tobj = reflect.TypeOf(vobj)
 	}
 
 	if tobj.Kind() != reflect.Struct {
@@ -103,13 +134,34 @@ func Restore(obj interface{}, fieldname string) error {
 }
 
 // 向slice或map中追加一个元素, 并保存
-func AppElement() {
+// 当map时, 使用HSET
+// 当slice时, 使用RPUSH
+func AppElement(obj interface{}, fieldname string, args ...interface{}) {
+	/*
+		if fieldname[0] < 'A' || fieldname[0] > 'Z' {
+			return fmt.Errorf("Param obj's field %s should be exported.\n", fieldname)
+		}
 
+		tobj := reflect.TypeOf(obj)
+		vobj := reflect.ValueOf(obj)
+
+		if tobj.Kind() == reflect.Ptr {
+			vobj = vobj.Elem()
+			tobj = reflect.TypeOf(vobj)
+		}
+
+		if tobj.Kind() != reflect.Struct {
+			return errors.New("Param obj must be Struct or Ptr of Struct.\n")
+		}
+	*/
 }
 
 // 从slice或map中删除一个元素, 并保存
-func RemElement() {
-
+func RemElement(obj interface{}, fieldname string, args ...interface{}) error {
+	if fieldname[0] < 'A' || fieldname[0] > 'Z' {
+		return fmt.Errorf("Param obj's field %s should be exported.\n", fieldname)
+	}
+	return nil
 }
 
 func hgetFromRedis(key string, field interface{}, typ reflect.Type) (interface{}, error) {

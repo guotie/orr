@@ -12,9 +12,14 @@ import (
 //
 // tags:
 //   orr
-//     index: 该字段名与结构名(结构名-字段名)，作为辅助hashmap，hashmap的field为该字段值，hashmap的值位obj.Id
-//     list: 该字段名与结构名(结构名-字段名)，作为辅助list
+//     index: 该字段名与结构名(结构名_字段名)，作为辅助hashmap，hashmap的field为该字段值，hashmap的值位obj.Id
+//     list: 该字段名与结构名(结构名_字段名)，作为辅助list
 //  example: `orr:"index"`
+
+// map,list数据过大的解决方法：
+//  当map,list数据较少时(1000个以内)，可以将map,list数据保存为json格式; 当map,list数据超过一定规模时，
+//  应使用redis的hashmap或list数据结构
+//  可以通过设置用户的relations来决定该数据是否以json格式保存
 
 // Insert用于初次数据到redis中，检查struct的tags，并根据tags的定义，
 // 来设置redis的辅助字段
@@ -27,22 +32,18 @@ func Insert(obj interface{}) (int64, error) {
 		return -1, fmt.Errorf("Param obj must be struct type.")
 	}
 
-	objName := getTypeName(rtobj)
-	sid, err := getLatestId("objName" + "Id")
-	if err != nil {
-		return -1, err
-	}
-	id, err := strconv.ParseInt(sid, 10, 64)
-	if err != nil {
-		return -1, err
-	}
-
 	buf, err := json.Marshal(obj)
 	if err != nil {
 		return -1, err
 	}
 
+	objName := getTypeName(rtobj)
+
 	// 查看结构体是否有辅助字段
+	var (
+		idxkeys   []string = make([]string, 0)
+		idxfields []string = make([]string, 0)
+	)
 	for i := 0; i < rtobj.NumField(); i++ {
 		structfield := rtobj.Field(i)
 		if structfield.Anonymous {
@@ -61,22 +62,37 @@ func Insert(obj interface{}) (int64, error) {
 				return -1, fmt.Errorf("index field must be string type!")
 			}
 			fv := fieldValue.Interface().(string)
-			if unique(objName+"-"+fieldName, fv) != true {
+			if unique(objName+"_"+fieldName, fv) != true {
 				return -1, fmt.Errorf("field %s has exist value %s.", fieldName, fieldValue)
 			}
-
-			hsetToRedis(objName+"-"+fieldName, fv, []byte(sid), "map")
-		} else if tag.Get("orr") == "list" {
-
+			idxkeys = append(idxkeys, objName+"_"+fieldName)
+			idxfields = append(idxfields, fv)
 		}
+	}
+
+	id := NewId(objName)
+	sid := strconv.FormatInt(id, 10)
+
+	bsid := []byte(sid)
+	for i := 0; i < len(idxkeys); i++ {
+		hsetToRedis(idxkeys[i], idxfields[i], bsid, "map")
 	}
 
 	err = hsetToRedis(objName, sid, buf, "map")
 	if err != nil {
+		for i := 0; i < len(idxkeys); i++ {
+			hdelFromRedis(idxkeys[i], idxfields[i], "map")
+		}
+
+		ReturnId(objName, id)
 		return -1, err
 	}
 
 	return id, nil
+}
+
+func BuildRelation() {
+
 }
 
 // 仅更新主hashmap
@@ -85,6 +101,7 @@ func Update(obj interface{}, objName string, objId int64) error {
 	if err != nil {
 		return err
 	}
+
 	err = hsetToRedis(objName, strconv.FormatInt(objId, 10), buf, "map")
 	return err
 }
@@ -93,6 +110,7 @@ func Delete(obj interface{}) error {
 	return nil
 }
 
+// 从redis中还原数据
 func Select(Id int64, name string, args ...interface{}) interface{} {
 	return nil
 }

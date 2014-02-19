@@ -56,6 +56,7 @@ func init() {
 	if err != nil {
 		panic(err.Error())
 	}
+	rconn = rpool.Get()
 }
 
 func reflectName() {
@@ -103,6 +104,12 @@ func saveRedis(key string, id int64, buf []byte) error {
 }
 
 func TestOrrGet(t *testing.T) {
+	var i []int = []int{1, 2, 3}
+	i = i[1:]
+	fmt.Println(i)
+	i = i[2:]
+	fmt.Println(i)
+	fmt.Println(i == nil)
 	acct1 := Account{Id: 1}
 	acct1.Reads = map[string]int64{"1": 100, "2": 200, "3": 300, "4": 400}
 	acct1.Follow = []FollowUser{FollowUser{1, 1}, FollowUser{2, 2}, FollowUser{3, 3}}

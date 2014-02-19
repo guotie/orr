@@ -64,22 +64,26 @@ func Save(obj interface{}, fieldname string) error {
 	}
 
 	if tobj.Kind() != reflect.Struct {
-		return errors.New("Param obj must be Struct or Ptr of Struct.\n")
+		return errors.New("Param obj must be Struct or Ptr of Struct.")
 	}
 
 	vfield := vobj.FieldByName(fieldname)
 	if !vfield.IsValid() {
-		return errors.New("Param obj's field " + fieldname + " is invalid.\n")
+		return errors.New("Param obj's field " + fieldname + " is invalid.")
 	}
 
 	vid := vobj.FieldByName("Id")
 	if !vid.IsValid() {
-		return errors.New("Param obj must has Id field.\n")
+		return errors.New("Param obj must has Id field.")
 	}
 	iid := vid.Int()
 
 	typName := getTypeName(tobj)
-	redisFieldname := typName + "-" + strings.ToLower(fieldname)
+	if strings.Contains(typName, "-") {
+		return errors.New("Struct name should not contains -.")
+	}
+
+	redisFieldname := typName + "_" + strings.ToLower(fieldname)
 
 	buf, err := json.Marshal(vfield.Interface())
 	if err != nil {
@@ -121,7 +125,7 @@ func Restore(obj interface{}, fieldname string) error {
 	iid := vid.Int()
 
 	typName := getTypeName(tobj)
-	redisFieldname := typName + "-" + strings.ToLower(fieldname)
+	redisFieldname := typName + "_" + strings.ToLower(fieldname)
 
 	if !vfield.CanSet() {
 		return fmt.Errorf("Param obj field %s cannot be set.\n", fieldname)
@@ -189,14 +193,18 @@ func hgetFromRedis(key string, field interface{}, typ reflect.Type) (interface{}
 }
 
 func hsetToRedis(key string, field interface{}, value []byte, typ string) error {
-	conn := rpool.Get()
-	defer conn.Close()
-	_, err := conn.Do("HSET", key, field, value)
+	//conn := rpool.Get()
+	//defer conn.Close()
+	_, err := rconn.Do("HSET", key, field, value)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func hdelFromRedis(key string, field interface{}, typ string) {
+	rconn.Do("HDEL", key, field)
 }
 
 func reverseString(s string) string {

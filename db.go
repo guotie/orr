@@ -101,14 +101,18 @@ func Insert(obj interface{}) (int64, error) {
 // 将结构体的field插入到数据库中
 // typ should be "key" or "hash"
 func InsertKeyField(typ, name string, fn string, id int64, value interface{}) error {
+	buf, err := json.Marshal(&value)
+	if err != nil {
+		return err
+	}
 	sid := strconv.FormatInt(id, 10)
 	switch typ {
 	case "key":
-		_, err := rconn.Do("SET", name+"_"+fn+"_"+sid, value)
+		_, err := rconn.Do("SET", name+"_"+fn+"_"+sid, buf)
 		return err
 
 	case "hash":
-		_, err := rconn.Do("HSET", name+"_"+fn, sid, value)
+		_, err := rconn.Do("HSET", name+"_"+fn, sid, buf)
 		return err
 
 	default:
@@ -171,6 +175,10 @@ func SelectKeyField(keyTyp string, name string,
 	}
 	if err != nil {
 		return err
+	}
+	if reply == nil {
+		res = reflect.New(reflect.TypeOf(res)).Elem()
+		return
 	}
 
 	err = json.Unmarshal(reply.([]byte), res)

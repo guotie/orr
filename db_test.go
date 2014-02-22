@@ -1,7 +1,7 @@
 package orr
 
 import (
-	"encoding/json"
+	//	"encoding/json"
 	"fmt"
 	//"reflect"
 	//"strconv"
@@ -69,33 +69,26 @@ func TestInsertField(t *testing.T) {
 	if _, err := Insert(&u); err != nil {
 		t.Fatal(err.Error())
 	}
-	buf, err := json.Marshal(&u.Group)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	err = InsertKeyField("hash", "user", "group", u.Id, buf)
+
+	err := InsertKeyField("hash", "user", "group", u.Id, u.Group)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	buf, err = json.Marshal(&u.Thread)
+	err = InsertKeyField("hash", "user", "thread", u.Id, &u.Thread)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	err = InsertKeyField("hash", "user", "thread", u.Id, buf)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	buf, err = json.Marshal(&u.Favor)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	err = InsertKeyField("hash", "user", "favor", u.Id, buf)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
+	/*
+		buf, err = json.Marshal(&u.Favor)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		err = InsertKeyField("hash", "user", "favor", u.Id, buf)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+	*/
 	// 从redis中获取数据
 	var u2 Tuser
 	err = Select(u.Id, "tuser", &u2)

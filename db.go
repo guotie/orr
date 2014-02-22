@@ -25,16 +25,14 @@ import (
 // 来设置redis的辅助字段
 // 返回Id
 func Insert(obj interface{}) (int64, error) {
-	rvobj := reflect.Indirect(reflect.ValueOf(obj))
+	if reflect.TypeOf(obj).Kind() != reflect.Ptr {
+		return -1, fmt.Errorf("param obj MUST be type Ptr.")
+	}
+	rvobj := reflect.ValueOf(obj).Elem()
 	rtobj := reflect.TypeOf(rvobj.Interface())
 
 	if rtobj.Kind() != reflect.Struct {
 		return -1, fmt.Errorf("Param obj must be struct type.")
-	}
-
-	buf, err := json.Marshal(obj)
-	if err != nil {
-		return -1, err
 	}
 
 	objName := getTypeName(rtobj)
@@ -43,6 +41,7 @@ func Insert(obj interface{}) (int64, error) {
 	var (
 		idxkeys   []string = make([]string, 0)
 		idxfields []string = make([]string, 0)
+		vid       reflect.Value
 	)
 	for i := 0; i < rtobj.NumField(); i++ {
 		structfield := rtobj.Field(i)
@@ -78,6 +77,14 @@ func Insert(obj interface{}) (int64, error) {
 		hsetToRedis(idxkeys[i], idxfields[i], bsid, "map")
 	}
 
+	vid = rvobj.FieldByName("Id")
+	vid.SetInt(id)
+	buf, err := json.Marshal(obj)
+	if err != nil {
+		ReturnId(objName, id)
+		return -1, err
+	}
+
 	err = hsetToRedis(objName, sid, buf, "map")
 	if err != nil {
 		for i := 0; i < len(idxkeys); i++ {
@@ -89,6 +96,26 @@ func Insert(obj interface{}) (int64, error) {
 	}
 
 	return id, nil
+}
+
+// 将结构体的field插入到数据库中
+// typ should be "key" or "hash"
+func InsertKeyField(typ, name string, fn string, id int64, value interface{}) error {
+	sid := strconv.FormatInt(id, 10)
+	switch typ {
+	case "key":
+		_, err := rconn.Do("SET", name+"_"+fn+"_"+sid, value)
+		return err
+
+	case "hash":
+		_, err := rconn.Do("HSET", name+"_"+fn, sid, value)
+		return err
+
+	default:
+		return fmt.Errorf("param typ invalid, must be key or hash or list.")
+	}
+
+	return nil
 }
 
 func BuildRelation() {
@@ -107,12 +134,47 @@ func Update(obj interface{}, objName string, objId int64) error {
 }
 
 func Delete(obj interface{}) error {
-	return nil
+	return fmt.Errorf("Not implement yet.")
 }
 
 // 从redis中还原数据
-func Select(Id int64, name string, args ...interface{}) interface{} {
-	return nil
+func Select(Id int64, name string, res interface{}) error {
+	if reflect.TypeOf(res).Kind() != reflect.Ptr {
+		return fmt.Errorf("param res must be Ptr type.")
+	}
+
+	reply, err := rconn.Do("HGET", name, strconv.FormatInt(Id, 10))
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(reply.([]byte), res)
+	return err
+}
+
+func SelectKeyField(keyTyp string, name string,
+	fn string, id int64, res interface{}) (err error) {
+	if reflect.TypeOf(res).Kind() != reflect.Ptr {
+		return fmt.Errorf("param res must be Ptr type.")
+	}
+	var reply interface{}
+
+	sid := strconv.FormatInt(id, 10)
+
+	switch keyTyp {
+	case "key":
+		reply, err = rconn.Do("GET", name+"_"+fn+"_"+sid)
+	case "hash":
+		reply, err = rconn.Do("HGET", name+"_"+fn, sid)
+	default:
+		return fmt.Errorf("Not support this keytype: %s", keyTyp)
+	}
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(reply.([]byte), res)
+	return err
 }
 
 func getLatestId(name string) (string, error) {

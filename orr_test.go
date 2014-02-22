@@ -103,7 +103,7 @@ func saveRedis(key string, id int64, buf []byte) error {
 	return err
 }
 
-func TestOrrGet(t *testing.T) {
+func _TestOrrGet(t *testing.T) {
 	var i []int = []int{1, 2, 3}
 	i = i[1:]
 	fmt.Println(i)
@@ -145,7 +145,7 @@ func TestOrrGet(t *testing.T) {
 
 }
 
-func TestSaveSpeed(t *testing.T) {
+func _TestSaveSpeed(t *testing.T) {
 	acct2 := &Account{Id: 2}
 	acct2.Reads = make(map[string]int64)
 	savespeed(acct2, 0)

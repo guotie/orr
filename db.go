@@ -64,7 +64,7 @@ func Insert(obj interface{}) (int64, error) {
 			if unique(objName+"_"+fieldName, fv) != true {
 				return -1, fmt.Errorf("field %s has exist value %s.", fieldName, fieldValue)
 			}
-			idxkeys = append(idxkeys, objName+"_"+strings.ToLower(fieldName))
+			idxkeys = append(idxkeys, objName+"_"+strings.Replace(strings.ToLower(fieldName), "_", "", -1))
 			idxfields = append(idxfields, fv)
 		}
 	}
@@ -228,6 +228,18 @@ func Select(Id int64, name string, res interface{}) error {
 
 	err = json.Unmarshal(reply.([]byte), res)
 	return err
+}
+
+func SelectIndex(name, fn, value string) (int64, error) {
+	reply, err := rconn.Do("HGET", name+"_"+fn, value)
+	if err != nil || reply == nil {
+		return -1, err
+	}
+	id, err := strconv.ParseInt(string(reply.([]byte)), 10, 64)
+	if err != nil {
+		return -1, err
+	}
+	return id, nil
 }
 
 func SelectKeyField(keyTyp string, name string,

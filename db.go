@@ -64,7 +64,7 @@ func Insert(obj interface{}) (int64, error) {
 			if unique(objName+"_"+fieldName, fv) != true {
 				return -1, fmt.Errorf("field %s has exist value %s.", fieldName, fieldValue)
 			}
-			idxkeys = append(idxkeys, objName+"_"+fieldName)
+			idxkeys = append(idxkeys, objName+"_"+strings.ToLower(fieldName))
 			idxfields = append(idxfields, fv)
 		}
 	}
@@ -138,7 +138,81 @@ func Update(obj interface{}, objName string, objId int64) error {
 }
 
 func Delete(obj interface{}) error {
-	return fmt.Errorf("Not implement yet.")
+	var (
+		rvobj reflect.Value
+		rtobj reflect.Type
+	)
+
+	if reflect.TypeOf(obj).Kind() == reflect.Ptr {
+		rvobj = reflect.ValueOf(obj).Elem()
+		rtobj = reflect.TypeOf(rvobj.Interface())
+	} else {
+		rvobj = reflect.ValueOf(obj)
+		rtobj = reflect.TypeOf(obj)
+	}
+
+	if rtobj.Kind() != reflect.Struct {
+		return fmt.Errorf("Param obj must be struct type.")
+	}
+
+	var (
+		idxfields []string
+		idxvalue  []string
+	)
+	objName := getTypeName(rtobj)
+
+	for i := 0; i < rtobj.NumField(); i++ {
+		structfield := rtobj.Field(i)
+		if structfield.Anonymous {
+			continue
+		}
+
+		fieldName := structfield.Name
+		tag := structfield.Tag
+		if tag == "" || tag == "-" {
+			continue
+		}
+
+		if tag.Get("orr") == "index" {
+			idxfields = append(idxfields, objName+"_"+strings.ToLower(fieldName))
+			idxvalue = append(idxvalue, rvobj.Field(i).String())
+		}
+	}
+
+	id := rvobj.FieldByName("Id").Int()
+	sid := strconv.FormatInt(id, 10)
+	for i, field := range idxfields {
+		rconn.Send("HDEL", field, idxvalue[i])
+	}
+	rconn.Send("HDEL", objName, sid)
+	rconn.Flush()
+	/*
+		for i := 0; i <= len(idxfields); i++ {
+			fmt.Println("rconn receive ", i)
+			r, err := rconn.Receive()
+			if err != nil {
+				fmt.Println(err.Error())
+			} else {
+				fmt.Println(r)
+			}
+		}
+	*/
+	return nil
+}
+
+func DeleteKeyField(typ string, name string, fn string, id int64) {
+	switch typ {
+	case "key":
+		rconn.Do("DEL", name+"_"+fn+"_"+strconv.FormatInt(id, 10))
+		return
+
+	case "hash":
+		rconn.Do("HDEL", name+"_"+fn, strconv.FormatInt(id, 10))
+		return
+
+	default:
+		panic("param typ invalid, must be key or hash or list.")
+	}
 }
 
 // 从redis中还原数据

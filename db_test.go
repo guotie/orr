@@ -16,9 +16,9 @@ type TmAction struct {
 
 type Tuser struct {
 	Id        int64
-	Name      string
-	Mobileno  string `db:"mobileno"`
-	Email     string `db:"email"`
+	Name      string `orr:"index"`
+	Mobileno  string `orr:"index"`
+	Email     string `orr:"index"`
 	Password  string `db:"passwd"`
 	MainUser  bool   `db:"mainuser"`
 	ApproveId string
@@ -37,7 +37,7 @@ func init() {
 
 func TestInsert(t *testing.T) {
 	u := Tuser{
-		Name: "铁哥"}
+		Name: "铁哥", Mobileno: "1234", Email: "g@gmail.com"}
 	id, err := Insert(&u)
 	if err != nil {
 		t.Fatal(err.Error())
@@ -56,6 +56,10 @@ func TestInsert(t *testing.T) {
 	}
 
 	fmt.Println(u2)
+	Delete(u2)
+
+	reply, err := rconn.Do("INCR", "smth")
+	fmt.Println(reply)
 }
 
 func TestInsertField(t *testing.T) {
@@ -110,4 +114,6 @@ func TestInsertField(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	fmt.Println(u2)
+
+	Delete(u2)
 }

@@ -24,7 +24,7 @@ import (
 // Insert用于初次数据到redis中，检查struct的tags，并根据tags的定义，
 // 来设置redis的辅助字段
 // 返回Id
-func Insert(obj interface{}) (int64, error) {
+func Insert(obj interface{}, index bool) (int64, error) {
 	if reflect.TypeOf(obj).Kind() != reflect.Ptr {
 		return -1, fmt.Errorf("param obj MUST be type Ptr.")
 	}
@@ -61,6 +61,14 @@ func Insert(obj interface{}) (int64, error) {
 				return -1, fmt.Errorf("index field must be string type!")
 			}
 			fv := fieldValue.Interface().(string)
+			if fv == "" {
+				if index {
+					return -1, fmt.Errorf("field %s should be index, but is empty.", fieldName)
+				} else {
+					continue
+				}
+			}
+
 			if unique(objName+"_"+fieldName, fv) != true {
 				return -1, fmt.Errorf("field %s has exist value %s.", fieldName, fieldValue)
 			}
@@ -174,8 +182,10 @@ func Delete(obj interface{}) error {
 		}
 
 		if tag.Get("orr") == "index" {
-			idxfields = append(idxfields, objName+"_"+strings.ToLower(fieldName))
-			idxvalue = append(idxvalue, rvobj.Field(i).String())
+			if rvobj.Field(i).String() != "" {
+				idxfields = append(idxfields, objName+"_"+strings.ToLower(fieldName))
+				idxvalue = append(idxvalue, rvobj.Field(i).String())
+			}
 		}
 	}
 

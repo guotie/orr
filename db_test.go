@@ -38,7 +38,7 @@ func init() {
 func TestInsert(t *testing.T) {
 	u := Tuser{
 		Name: "铁哥", Mobileno: "1234", Email: "g@gmail.com"}
-	id, err := Insert(&u)
+	id, err := Insert(&u, true)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -70,7 +70,7 @@ func TestInsertField(t *testing.T) {
 	u.Thread = []int64{1, 2, 3, 4, 5, 6, 7}
 	u.Favor = []TmAction{TmAction{10, 10, "thread"}, TmAction{9, 9, "reply"},
 		TmAction{8, 8, "user"}, TmAction{7, 7, "group"}}
-	if _, err := Insert(&u); err != nil {
+	if _, err := Insert(&u, true); err != nil {
 		t.Fatal(err.Error())
 	}
 

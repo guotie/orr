@@ -113,14 +113,16 @@ func InsertKeyField(typ, name string, fn string, id int64, value interface{}) er
 	if err != nil {
 		return err
 	}
+	conn := rpool.Get()
+	defer conn.Close()
 	sid := strconv.FormatInt(id, 10)
 	switch typ {
 	case "key":
-		_, err := rconn.Do("SET", name+"_"+fn+"_"+sid, buf)
+		_, err := conn.Do("SET", name+"_"+fn+"_"+sid, buf)
 		return err
 
 	case "hash":
-		_, err := rconn.Do("HSET", name+"_"+fn, sid, buf)
+		_, err := conn.Do("HSET", name+"_"+fn, sid, buf)
 		return err
 
 	default:
@@ -188,18 +190,19 @@ func Delete(obj interface{}) error {
 			}
 		}
 	}
-
+	conn := rpool.Get()
+	defer conn.Close()
 	id := rvobj.FieldByName("Id").Int()
 	sid := strconv.FormatInt(id, 10)
 	for i, field := range idxfields {
-		rconn.Send("HDEL", field, idxvalue[i])
+		conn.Send("HDEL", field, idxvalue[i])
 	}
-	rconn.Send("HDEL", objName, sid)
-	rconn.Flush()
+	conn.Send("HDEL", objName, sid)
+	conn.Flush()
 	/*
 		for i := 0; i <= len(idxfields); i++ {
-			fmt.Println("rconn receive ", i)
-			r, err := rconn.Receive()
+			fmt.Println("conn receive ", i)
+			r, err := conn.Receive()
 			if err != nil {
 				fmt.Println(err.Error())
 			} else {
@@ -211,13 +214,15 @@ func Delete(obj interface{}) error {
 }
 
 func DeleteKeyField(typ string, name string, fn string, id int64) {
+	conn := rpool.Get()
+	defer conn.Close()
 	switch typ {
 	case "key":
-		rconn.Do("DEL", name+"_"+fn+"_"+strconv.FormatInt(id, 10))
+		conn.Do("DEL", name+"_"+fn+"_"+strconv.FormatInt(id, 10))
 		return
 
 	case "hash":
-		rconn.Do("HDEL", name+"_"+fn, strconv.FormatInt(id, 10))
+		conn.Do("HDEL", name+"_"+fn, strconv.FormatInt(id, 10))
 		return
 
 	default:
@@ -230,8 +235,9 @@ func Select(Id int64, name string, res interface{}) error {
 	if reflect.TypeOf(res).Kind() != reflect.Ptr {
 		return fmt.Errorf("param res must be Ptr type.")
 	}
-
-	reply, err := rconn.Do("HGET", name, strconv.FormatInt(Id, 10))
+	conn := rpool.Get()
+	defer conn.Close()
+	reply, err := conn.Do("HGET", name, strconv.FormatInt(Id, 10))
 	if err != nil {
 		return err
 	}
@@ -241,7 +247,9 @@ func Select(Id int64, name string, res interface{}) error {
 }
 
 func SelectIndex(name, fn, value string) (int64, error) {
-	reply, err := rconn.Do("HGET", name+"_"+fn, value)
+	conn := rpool.Get()
+	defer conn.Close()
+	reply, err := conn.Do("HGET", name+"_"+fn, value)
 	if err != nil || reply == nil {
 		return -1, err
 	}
@@ -260,12 +268,13 @@ func SelectKeyField(keyTyp string, name string,
 	var reply interface{}
 
 	sid := strconv.FormatInt(id, 10)
-
+	conn := rpool.Get()
+	defer conn.Close()
 	switch keyTyp {
 	case "key":
-		reply, err = rconn.Do("GET", name+"_"+fn+"_"+sid)
+		reply, err = conn.Do("GET", name+"_"+fn+"_"+sid)
 	case "hash":
-		reply, err = rconn.Do("HGET", name+"_"+fn, sid)
+		reply, err = conn.Do("HGET", name+"_"+fn, sid)
 	default:
 		return fmt.Errorf("Not support this keytype: %s", keyTyp)
 	}
@@ -282,7 +291,9 @@ func SelectKeyField(keyTyp string, name string,
 }
 
 func getLatestId(name string) (string, error) {
-	reply, err := rconn.Do("INCR", name)
+	conn := rpool.Get()
+	defer conn.Close()
+	reply, err := conn.Do("INCR", name)
 	if err != nil {
 		return "", err
 	}
@@ -312,7 +323,9 @@ func parseTag(str string) (typ string, addational_typ string) {
 }
 
 func unique(name string, value string) bool {
-	reply, _ := rconn.Do("HGET", name, value)
+	conn := rpool.Get()
+	defer conn.Close()
+	reply, _ := conn.Do("HGET", name, value)
 	if reply != nil {
 		return false
 	}

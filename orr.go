@@ -16,7 +16,6 @@ import (
 
 var (
 	rpool *redis.Pool
-	rconn redis.Conn
 )
 
 func OpenRedis(proto, addr string) {
@@ -43,11 +42,12 @@ func OpenRedis(proto, addr string) {
 			return err
 		},
 	}
-	rconn = rpool.Get()
-	_, err := rconn.Do("PING")
+	conn := rpool.Get()
+	_, err := conn.Do("PING")
 	if err != nil {
 		panic(err.Error())
 	}
+	conn.Close()
 }
 
 // 将数据结构Marshal, 并保存
@@ -194,9 +194,9 @@ func hgetFromRedis(key string, field interface{}, typ reflect.Type) (interface{}
 }
 
 func hsetToRedis(key string, field interface{}, value []byte, typ string) error {
-	//conn := rpool.Get()
-	//defer conn.Close()
-	_, err := rconn.Do("HSET", key, field, value)
+	conn := rpool.Get()
+	defer conn.Close()
+	_, err := conn.Do("HSET", key, field, value)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,9 @@ func hsetToRedis(key string, field interface{}, value []byte, typ string) error 
 }
 
 func hdelFromRedis(key string, field interface{}, typ string) {
-	rconn.Do("HDEL", key, field)
+	conn := rpool.Get()
+	defer conn.Close()
+	conn.Do("HDEL", key, field)
 }
 
 func reverseString(s string) string {
